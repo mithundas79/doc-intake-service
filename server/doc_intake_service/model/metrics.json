@@ -1,0 +1,77 @@
+{
+  "trained_on": "synthetic corpus from training/generate_corpus.py (fictional vendors, generated text)",
+  "documents": 1200,
+  "held_out": 300,
+  "labels": [
+    "contract",
+    "invoice",
+    "receipt",
+    "statement"
+  ],
+  "classification_report": {
+    "contract": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 75.0
+    },
+    "invoice": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 75.0
+    },
+    "receipt": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 75.0
+    },
+    "statement": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 75.0
+    },
+    "accuracy": 1.0,
+    "macro avg": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 300.0
+    },
+    "weighted avg": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 300.0
+    }
+  },
+  "confusion_matrix": [
+    [
+      75,
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      75,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      75,
+      0
+    ],
+    [
+      0,
+      0,
+      0,
+      75
+    ]
+  ],
+  "honest_note": "These numbers measure performance on synthetic documents that share a generator with the training data. They say the pipeline works; they say nothing about real-world scans, photographed receipts, or layouts the generator never produced. A production deployment needs real, labelled documents and re-training."
+}
