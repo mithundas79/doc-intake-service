@@ -7,3 +7,5 @@ dist/
 *.egg-info/
 out/
 .DS_Store
+training/corpus.jsonl
+data/
