@@ -1,0 +1,7 @@
+fastapi==0.115.*
+uvicorn==0.30.*
+python-multipart==0.0.*
+pytesseract==0.3.*
+Pillow==10.*
+scikit-learn==1.5.*
+joblib==1.4.*
