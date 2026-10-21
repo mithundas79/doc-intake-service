@@ -1,0 +1,247 @@
+{
+  "fixture_sha256": "d5b0d38e81a6fc00336c9e2d3ea7389132f3de947630b700f36da0e70ae4bc2c",
+  "model_sha256": "e86ecf0229999be95f63241cc2dda351e5e2685da2cc7ce62fb777d997c9449f",
+  "documents": 24,
+  "labels": [
+    "contract",
+    "invoice",
+    "receipt",
+    "statement"
+  ],
+  "classification_report": {
+    "contract": {
+      "precision": 1.0,
+      "recall": 0.8333333333333334,
+      "f1-score": 0.9090909090909091,
+      "support": 6.0
+    },
+    "invoice": {
+      "precision": 0.6666666666666666,
+      "recall": 0.6666666666666666,
+      "f1-score": 0.6666666666666666,
+      "support": 6.0
+    },
+    "receipt": {
+      "precision": 0.6,
+      "recall": 1.0,
+      "f1-score": 0.75,
+      "support": 6.0
+    },
+    "statement": {
+      "precision": 1.0,
+      "recall": 0.5,
+      "f1-score": 0.6666666666666666,
+      "support": 6.0
+    },
+    "accuracy": 0.75,
+    "macro avg": {
+      "precision": 0.8166666666666667,
+      "recall": 0.75,
+      "f1-score": 0.7481060606060606,
+      "support": 24.0
+    },
+    "weighted avg": {
+      "precision": 0.8166666666666668,
+      "recall": 0.75,
+      "f1-score": 0.7481060606060606,
+      "support": 24.0
+    }
+  },
+  "confusion_matrix": [
+    [
+      5,
+      0,
+      1,
+      0
+    ],
+    [
+      0,
+      4,
+      2,
+      0
+    ],
+    [
+      0,
+      0,
+      6,
+      0
+    ],
+    [
+      0,
+      2,
+      1,
+      3
+    ]
+  ],
+  "results": [
+    {
+      "id": "inv-01",
+      "expected": "invoice",
+      "predicted": "receipt",
+      "confidence": 0.3113,
+      "ready_before_review": false
+    },
+    {
+      "id": "inv-02",
+      "expected": "invoice",
+      "predicted": "invoice",
+      "confidence": 0.5052,
+      "ready_before_review": false
+    },
+    {
+      "id": "inv-03",
+      "expected": "invoice",
+      "predicted": "receipt",
+      "confidence": 0.467,
+      "ready_before_review": false
+    },
+    {
+      "id": "inv-04",
+      "expected": "invoice",
+      "predicted": "invoice",
+      "confidence": 0.8724,
+      "ready_before_review": true
+    },
+    {
+      "id": "inv-05",
+      "expected": "invoice",
+      "predicted": "invoice",
+      "confidence": 0.5088,
+      "ready_before_review": false
+    },
+    {
+      "id": "inv-06",
+      "expected": "invoice",
+      "predicted": "invoice",
+      "confidence": 0.5273,
+      "ready_before_review": false
+    },
+    {
+      "id": "rec-01",
+      "expected": "receipt",
+      "predicted": "receipt",
+      "confidence": 0.6769,
+      "ready_before_review": false
+    },
+    {
+      "id": "rec-02",
+      "expected": "receipt",
+      "predicted": "receipt",
+      "confidence": 0.4269,
+      "ready_before_review": false
+    },
+    {
+      "id": "rec-03",
+      "expected": "receipt",
+      "predicted": "receipt",
+      "confidence": 0.5183,
+      "ready_before_review": false
+    },
+    {
+      "id": "rec-04",
+      "expected": "receipt",
+      "predicted": "receipt",
+      "confidence": 0.4151,
+      "ready_before_review": false
+    },
+    {
+      "id": "rec-05",
+      "expected": "receipt",
+      "predicted": "receipt",
+      "confidence": 0.5978,
+      "ready_before_review": false
+    },
+    {
+      "id": "rec-06",
+      "expected": "receipt",
+      "predicted": "receipt",
+      "confidence": 0.795,
+      "ready_before_review": false
+    },
+    {
+      "id": "stmt-01",
+      "expected": "statement",
+      "predicted": "statement",
+      "confidence": 0.7859,
+      "ready_before_review": false
+    },
+    {
+      "id": "stmt-02",
+      "expected": "statement",
+      "predicted": "invoice",
+      "confidence": 0.4432,
+      "ready_before_review": false
+    },
+    {
+      "id": "stmt-03",
+      "expected": "statement",
+      "predicted": "statement",
+      "confidence": 0.3669,
+      "ready_before_review": false
+    },
+    {
+      "id": "stmt-04",
+      "expected": "statement",
+      "predicted": "statement",
+      "confidence": 0.5333,
+      "ready_before_review": false
+    },
+    {
+      "id": "stmt-05",
+      "expected": "statement",
+      "predicted": "invoice",
+      "confidence": 0.3399,
+      "ready_before_review": false
+    },
+    {
+      "id": "stmt-06",
+      "expected": "statement",
+      "predicted": "receipt",
+      "confidence": 0.4126,
+      "ready_before_review": false
+    },
+    {
+      "id": "con-01",
+      "expected": "contract",
+      "predicted": "contract",
+      "confidence": 0.4684,
+      "ready_before_review": false
+    },
+    {
+      "id": "con-02",
+      "expected": "contract",
+      "predicted": "contract",
+      "confidence": 0.6442,
+      "ready_before_review": false
+    },
+    {
+      "id": "con-03",
+      "expected": "contract",
+      "predicted": "contract",
+      "confidence": 0.3711,
+      "ready_before_review": false
+    },
+    {
+      "id": "con-04",
+      "expected": "contract",
+      "predicted": "contract",
+      "confidence": 0.3775,
+      "ready_before_review": false
+    },
+    {
+      "id": "con-05",
+      "expected": "contract",
+      "predicted": "contract",
+      "confidence": 0.5493,
+      "ready_before_review": false
+    },
+    {
+      "id": "con-06",
+      "expected": "contract",
+      "predicted": "receipt",
+      "confidence": 0.3625,
+      "ready_before_review": false
+    }
+  ],
+  "limitations": "24 hand-authored fictional text documents, six per class. Separately prepared from the training generator but still synthetic; not a blind real-world benchmark, not OCR or extraction accuracy. No training/tuning performed on this evaluation. Ready means deterministic checks passed, never auto-approved."
+}

@@ -1,0 +1,10 @@
+Northwind Supplies
+INVOICE USD
+Invoice No: NW-2026-0481
+Invoice Date: 12 Aug 2026
+Filter cartridges 10 in 24 408.00
+Sealing rings box of 50 6 171.00
+Delivery 1 45.00
+Subtotal 624.00
+Tax 8.5% 53.04
+Total Due 677.04

@@ -9,3 +9,8 @@ out/
 .DS_Store
 training/corpus.jsonl
 data/
+
+.tmp/
+playwright-report/
+test-results/
+test-results-demo/

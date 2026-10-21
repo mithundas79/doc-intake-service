@@ -1,0 +1,9 @@
+Ridgeway Trading
+INVOICE USD
+Invoice No: RT-9912
+Invoice Date: 03 Aug 2026
+Pallet wrap 12 216.00
+Strapping tape 4 88.00
+Subtotal 304.00
+Tax 8.5% 25.84
+Total Due 349.84

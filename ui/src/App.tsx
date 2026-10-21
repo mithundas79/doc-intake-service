@@ -1,195 +1,148 @@
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import "./style.css";
 
-/*
- * Thin client over the FastAPI service. All judgment lives server-side;
- * this page uploads a document and renders what came back - the extracted
- * record, the trained classifier's confidence, the rule results and the
- * verdict - plus the model's own honesty note from /api/health.
- */
-
-interface RuleResult {
-  ok: boolean;
-  rule: string;
-  detail: string | null;
-}
-
-interface Processed {
-  name: string;
-  sha256: string;
-  ocr_used: boolean;
-  ocr_confidence: number | null;
-  record: Record<string, unknown>;
-  prediction: { label: string; confidence: number; alternatives: [string, number][] };
-  checks: RuleResult[];
-  verdict: "file" | "review";
+type Rule = { ok: boolean; rule: string; detail: string };
+type RecordFields = Record<string, string | number | string[] | null>;
+type Document = {
+  id: string; name: string; state: string; kind: string; version: number; error: string | null;
+  record?: RecordFields; doc_type?: string; type_confirmed?: boolean; manual_note?: string;
+  checks?: Rule[]; text?: string; ocr_used?: boolean; pages?: number;
+  prediction?: { label: string; confidence: number };
+};
+const fields = ["vendor", "number", "date", "due_date", "currency", "subtotal", "tax", "total", "line_total"];
+async function api<T>(path: string, init?: RequestInit): Promise<T> {
+  const response = await fetch(`/api${path}`, init);
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: response.statusText }));
+    throw new Error(typeof error.detail === "string" ? error.detail : JSON.stringify(error.detail));
+  }
+  return response.json() as Promise<T>;
 }
 
 export function App(): JSX.Element {
-  const [health, setHealth] = useState<{ model_present: boolean; model_note: string } | null>(null);
+  const [documents, setDocuments] = useState<Document[]>([]);
+  const [selected, setSelected] = useState<string | null>(null);
+  const selectedRef = useRef<string | null>(null);
+  const docRef = useRef<Document | null>(null);
+  const [doc, setDoc] = useState<Document | null>(null);
+  const [record, setRecord] = useState<RecordFields>({});
+  const [type, setType] = useState("invoice");
+  const [confirmed, setConfirmed] = useState(false);
+  const [note, setNote] = useState("");
+  const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<Processed | null>(null);
+  const [dirty, setDirty] = useState(false);
+  const [history, setHistory] = useState<{ seq: number; action: string; created: number; details: unknown }[]>([]);
+  const [modelNote, setModelNote] = useState("");
 
+  async function refreshList() { setDocuments(await api<Document[]>("/documents")); }
+  function load(value: Document) {
+    const current = docRef.current;
+    if (current?.id === value.id && (current.version > value.version || (current.version === value.version && current.state === value.state))) return;
+    docRef.current = value;
+    setDoc(value); setRecord(value.record ?? {}); setType(value.doc_type ?? "invoice");
+    setConfirmed(value.type_confirmed ?? false); setNote(value.manual_note ?? ""); setDirty(false);
+  }
   useEffect(() => {
-    fetch("/api/health")
-      .then((r) => r.json())
-      .then(setHealth)
-      .catch(() => setError("The API is not reachable - is the server running on :8000?"));
+    void refreshList().catch(e => setError(String(e)));
+    void api<{ model_note: string }>("/health").then(h => setModelNote(h.model_note)).catch(e => setError(String(e)));
+    const timer = setInterval(() => { void refreshList().catch(e => setError(String(e))); }, 900);
+    return () => clearInterval(timer);
   }, []);
+  useEffect(() => {
+    if (!selected) return;
+    let alive = true;
+    void api<Document>(`/documents/${selected}`).then(value => { if (alive && selectedRef.current === value.id) load(value); }).catch(e => setError(String(e)));
+    return () => { alive = false; };
+  }, [selected]);
+  useEffect(() => {
+    if (!doc || !["queued", "processing"].includes(doc.state)) return;
+    let alive = true;
+    let inFlight = false;
+    const timer = setInterval(() => {
+      if (inFlight) return;
+      inFlight = true;
+      void api<Document>(`/documents/${doc.id}`).then(value => {
+        if (alive && selectedRef.current === value.id) load(value);
+      }).catch(e => { if (alive) setError(String(e)); }).finally(() => { inFlight = false; });
+    }, 500);
+    return () => { alive = false; clearInterval(timer); };
+  }, [doc?.id, doc?.state]);
+  useEffect(() => {
+    let alive = true;
+    if (doc) void api<typeof history>(`/documents/${doc.id}/history`).then(value => {
+      if (alive && selectedRef.current === doc.id) setHistory(value);
+    }).catch(e => { if (alive) setError(String(e)); });
+    return () => { alive = false; };
+  }, [doc?.id, doc?.version]);
 
-  const upload = useCallback(async (file: File) => {
-    setBusy(true);
-    setError(null);
+  async function upload(file: File) {
+    setBusy(true); setError("");
     try {
-      const form = new FormData();
-      form.append("file", file);
-      const r = await fetch("/api/documents", { method: "POST", body: form });
-      if (!r.ok) {
-        const body = (await r.json().catch(() => null)) as { detail?: string } | null;
-        throw new Error(body?.detail ?? `upload failed (${r.status})`);
-      }
-      setResult((await r.json()) as Processed);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setBusy(false);
-    }
-  }, []);
-
-  const fails = result?.checks.filter((c) => !c.ok) ?? [];
-  const pct = (n: number): string => `${Math.round(n * 100)}%`;
-
-  return (
-    <div className="wrap">
-      <style>{CSS}</style>
-      <header>
-        <h1>doc-intake-service</h1>
-        <p className="lede">
-          Upload a scanned document (or a .txt to skip OCR). The Python backend reads it with
-          native Tesseract, a <b>trained classifier</b> names the document type with a confidence,
-          and deterministic rules decide whether it files itself or waits for a person.{" "}
-          <a href="https://github.com/mithundas79/doc-intake-service">Source on GitHub</a>.
-        </p>
-        {health && <p className="banner">{health.model_note}</p>}
-        {error && <p className="banner err">{error}</p>}
-      </header>
-
-      <div className="bar">
-        <label className="file">
-          {busy ? "Working…" : "Choose a document"}
-          <input
-            type="file"
-            accept="image/*,.txt"
-            disabled={busy}
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (f) void upload(f);
-              e.target.value = "";
-            }}
-          />
-        </label>
-        <span className="muted">PNG, JPG or TXT · processed locally by your own server</span>
-      </div>
-
-      {result && (
-        <div className="cols">
-          <div>
-            <div className="card">
-              <h2>Classifier</h2>
-              <div className="predrow">
-                <b>{result.prediction.label}</b>
-                <div className="meter">
-                  <i style={{ width: pct(result.prediction.confidence) }} />
-                </div>
-                <span>{pct(result.prediction.confidence)}</span>
-              </div>
-              <p className="muted">
-                next:{" "}
-                {result.prediction.alternatives
-                  .map(([l, c]) => `${l} ${pct(c)}`)
-                  .join(" · ")}
-                {result.ocr_used
-                  ? ` — OCR confidence ${result.ocr_confidence ?? "?"}%`
-                  : " — text upload, OCR skipped"}
-              </p>
-            </div>
-            <div className="card">
-              <h2>Extracted record</h2>
-              <pre>{JSON.stringify(result.record, null, 2)}</pre>
-              <p className="muted">sha256 {result.sha256.slice(0, 16)}…</p>
-            </div>
-          </div>
-          <div>
-            <div className="card">
-              <h2>Rule checks</h2>
-              {result.checks.map((c, i) => (
-                <div key={i} className="rule">
-                  <span className={c.ok ? "pill ok" : "pill bad"}>{c.ok ? "pass" : "check"}</span>
-                  <div>
-                    <b>{c.rule}</b>
-                    <div className="muted">{c.detail}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="card">
-              <h2>Verdict</h2>
-              {result.verdict === "file" ? (
-                <p>
-                  <span className="pill ok">files itself</span>{" "}
-                  <span className="muted">Every rule passed.</span>
-                </p>
-              ) : (
-                <p>
-                  <span className="pill bad">held for review</span>{" "}
-                  <span className="muted">
-                    {fails.length} rule{fails.length > 1 ? "s" : ""} failed — a person looks at this
-                    one. That is the correct outcome, not a failure.
-                  </span>
-                </p>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      <footer className="muted">
-        Demo system: the classifier is trained on a synthetic corpus and will not handle every real
-        document — see the README for what production hardening requires. MIT licensed.
-      </footer>
+      const form = new FormData(); form.append("file", file);
+      const value = await api<Document>("/documents", { method: "POST", body: form });
+      selectedRef.current = value.id; load(value); setSelected(value.id); await refreshList();
+    } catch (e) { setError(String(e)); } finally { setBusy(false); }
+  }
+  async function mutate(action: "review" | "approve" | "reject" | "reopen") {
+    if (!doc) return;
+    setBusy(true); setError("");
+    try {
+      const body = { version: doc.version, request_id: crypto.randomUUID(), note,
+        ...(action === "review" ? { record, doc_type: type, type_confirmed: confirmed } : {}) };
+      load(await api<Document>(`/documents/${doc.id}/${action}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }));
+      await refreshList();
+    } catch (e) { setError(String(e)); } finally { setBusy(false); }
+  }
+  async function exportRecords(format: "json" | "csv") {
+    setError("");
+    try {
+      const response = await fetch(`/api/exports/${format}`, { method: "POST" });
+      if (!response.ok) throw new Error("Export failed");
+      const url = URL.createObjectURL(await response.blob());
+      const a = document.createElement("a"); a.href = url; a.download = `approved-records.${format}`; a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (e) { setError(String(e)); }
+  }
+  const editable = !!doc && ["review", "ready"].includes(doc.state);
+  const failures = doc?.checks?.filter(c => !c.ok) ?? [];
+  return <main>
+    <header><p className="eyebrow">LOCAL DOCUMENT WORKSPACE</p><h1>Intake & review</h1>
+      <p>Compare the original, correct extracted fields, then make an explicit decision.</p>
+      <details><summary>Classifier limits and local use</summary><p>{modelNote}</p><p>Single user, loopback server, no authentication. Do not expose this service to a network. Only invoices have accounting automation; other types require an explicit manual review note.</p></details>
+    </header>
+    <div className="toolbar"><label>Upload document <input aria-label="Upload document" type="file" accept=".txt,.pdf,.png,.jpg,.jpeg,.webp,.bmp,.tif,.tiff" disabled={busy} onChange={e => { const f = e.target.files?.[0]; if (f) void upload(f); e.target.value = ""; }} /></label>
+      <span>8 MB  |  up to 10 pages  |  UTF-8 text, PDF or image</span>
+      <button onClick={() => void exportRecords("json")}>Export approved JSON</button><button onClick={() => void exportRecords("csv")}>Export approved CSV</button>
     </div>
-  );
+    {error && <p role="alert" className="error">{error} <button onClick={() => { if (selected) void api<Document>(`/documents/${selected}`).then(load); }}>Reload selected document</button></p>}
+    <div className="workspace"><aside aria-label="Document list"><h2>Documents <small>{documents.length}</small></h2>
+      {documents.length === 0 && <p>No documents yet. Choose a sample to begin.</p>}
+      {documents.map(d => <button className={`document ${d.id === selected ? "selected" : ""}`} key={d.id} disabled={busy} onClick={() => { selectedRef.current = d.id; setSelected(d.id); setError(""); }}><strong>{d.name}</strong><span className={`status ${d.state}`}>{d.state}</span></button>)}
+    </aside>
+    {!doc ? <section className="empty"><h2>Your review starts here</h2><p>Upload an original or select a document from the list. Originals and review history survive restart.</p></section> : <article>
+      <div className="title"><h2>{doc.name}</h2><span data-testid="document-state" className={`status ${doc.state}`}>{doc.state}</span></div>
+      {["queued", "processing"].includes(doc.state) && <p role="status">{doc.state === "queued" ? "Queued for a background worker..." : "Reading pages and extracting fields..."}</p>}
+      {doc.error && <p className="error">{doc.error}</p>}
+      <div className="review"><section><h3>Original</h3><a href={`/api/documents/${doc.id}/original`} target="_blank" rel="noreferrer">Open original</a>
+        {doc.kind === "image" && doc.state !== "failed" ? <img alt="Original document" src={`/api/documents/${doc.id}/original`} /> : doc.kind === "application/pdf" ? <iframe title="Original document" src={`/api/documents/${doc.id}/original`} /> : <pre aria-label="Original text">{doc.text ?? "Text will appear after processing."}</pre>}
+        {doc.text && doc.kind !== "text/plain" && <details><summary>Extracted text</summary><pre>{doc.text}</pre></details>}
+      </section>
+      {doc.record && <section><h3>Review fields</h3><p className="muted">Suggested {doc.prediction?.label}  |  {Math.round((doc.prediction?.confidence ?? 0)*100)}% confidence  |  {doc.ocr_used ? "OCR used" : "embedded / uploaded text"}  |  {doc.pages} page(s)</p>
+        <fieldset disabled={!editable || busy}><label>Document type<select aria-label="Document type" value={type} onChange={e => { setType(e.target.value); setDirty(true); }}>{["invoice", "receipt", "statement", "contract", "credit_note", "other"].map(t => <option key={t}>{t}</option>)}</select></label>
+          <div className="fields">{fields.map(field => <label key={field}>{field.replaceAll("_", " ")}<input aria-label={field} value={String(record[field] ?? "")} onChange={e => { setRecord({ ...record, [field]: e.target.value || null }); setDirty(true); }} /></label>)}</div>
+          <label className="checkbox"><input type="checkbox" checked={confirmed} onChange={e => { setConfirmed(e.target.checked); setDirty(true); }} />I checked the document type against the original</label>
+          <label>Review / rejection note<textarea aria-label="Review note" value={note} onChange={e => { setNote(e.target.value); setDirty(true); }} /></label>
+          <p className="muted">Amounts use two decimal places and an explicit currency. Date: YYYY-MM-DD. For manual types, confirm the type and enter a note of at least 10 characters.</p>
+          <button className="primary" onClick={() => void mutate("review")}>Save corrections & revalidate</button>
+        </fieldset>
+        <div className="checks"><h3>Validation  |  {failures.length} failed</h3>{doc.checks?.map(c => <div className={c.ok ? "check pass" : "check fail"} key={c.rule}><strong>{c.ok ? "Pass" : "Check"}: {c.rule}</strong><p>{c.detail}</p></div>)}</div>
+        {editable && <div className="decisions"><button className="primary" disabled={busy || dirty || doc.state !== "ready"} onClick={() => void mutate("approve")}>Approve document</button><button disabled={busy} onClick={() => void mutate("reject")}>Reject document</button>{dirty && <p>Save and revalidate your changes before approval.</p>}</div>}
+        {doc.state === "approved" && <p className="success">Approved. This record is included in exports; the decision is final.</p>}
+        {doc.state === "rejected" && <div><p>Rejected. Excluded from exports. Reopen this original to recover a mistaken rejection.</p><label>Reopen reason<input aria-label="Reopen reason" value={note} onChange={e => setNote(e.target.value)} /></label><button onClick={() => void mutate("reopen")}>Reopen for review</button></div>}
+      </section>}
+      </div><details className="history"><summary>Review history ({history.length})</summary><ol>{history.map(h => <li key={h.seq}><strong>{h.action}</strong>  |  {new Date(h.created*1000).toLocaleString()}<pre>{JSON.stringify(h.details, null, 2)}</pre></li>)}</ol></details>
+    </article>}
+    </div>
+  </main>;
 }
-
-const CSS = `
-  :root { color-scheme: light; }
-  * { box-sizing: border-box; }
-  body { margin: 0; background: #f6f8fa; color: #0f172a;
-         font: 15px/1.5 "Segoe UI", system-ui, sans-serif; }
-  .wrap { max-width: 1100px; margin: 0 auto; padding: 28px 20px 40px; }
-  h1 { margin: 0; font-size: 28px; }
-  .lede { color: #475569; max-width: 75ch; }
-  a { color: #0891b2; }
-  .banner { background: #fff7ed; border: 1.5px solid #fdba74; color: #9a3412;
-            border-radius: 8px; padding: 8px 12px; font-size: 13px; max-width: 75ch; }
-  .banner.err { background: #fef2f2; border-color: #fca5a5; color: #b91c1c; }
-  .bar { display: flex; gap: 12px; align-items: center; margin: 14px 0 18px; flex-wrap: wrap; }
-  .file { border: 1.5px solid #cbd5e1; background: #fff; border-radius: 8px;
-          padding: 8px 14px; cursor: pointer; }
-  .file input { display: none; }
-  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-  @media (max-width: 900px) { .cols { grid-template-columns: 1fr; } }
-  .card { background: #fff; border: 1.5px solid #e2e8f0; border-radius: 10px;
-          padding: 14px 16px; margin-bottom: 16px; }
-  .card h2 { margin: 0 0 10px; font-size: 15px; }
-  pre { margin: 0; font-size: 12.5px; overflow-x: auto; }
-  .rule { display: flex; gap: 10px; padding: 8px 0; border-top: 1px solid #eef2f6; font-size: 13.5px; }
-  .pill { display: inline-block; border-radius: 999px; padding: 2px 10px; font-size: 12px; font-weight: 600; }
-  .pill.ok { background: #ecfdf5; color: #0f766e; }
-  .pill.bad { background: #fff7ed; color: #b45309; }
-  .muted { color: #64748b; font-size: 13px; }
-  .predrow { display: flex; align-items: center; gap: 12px; font-size: 16px; }
-  .meter { flex: 1; height: 8px; background: #eef2f6; border-radius: 4px; overflow: hidden; }
-  .meter i { display: block; height: 100%; background: #0891b2; }
-  footer { margin-top: 8px; }
-`;
