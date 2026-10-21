@@ -13,3 +13,4 @@ data/
 .tmp/
 playwright-report/
 test-results/
+test-results-demo/

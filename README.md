@@ -1,58 +1,177 @@
-# Local document intake and review
+# doc-intake-service
 
-An installable single-user FastAPI + React application. Upload an original, wait for bounded background extraction, compare the original with proposed fields, correct and revalidate, then explicitly approve or reject. **Nothing is automatically approved.** Only approved records appear in JSON/CSV exports.
+A local document review workspace for one person handling invoices and business documents. Upload TXT, an image or a multipage PDF; background workers propose text, fields and a document type; compare them with the original, correct mistakes, revalidate, and explicitly approve or reject. SQLite keeps originals, decisions, duplicate identity and review history across restarts. JSON/CSV exports contain **approved records only**. Nothing is automatically approved.
 
-The classifier is a small offline TF-IDF/logistic-regression model. Its suggestions are fallible. Accounting checks are implemented for invoices only. Contracts, statements, receipts, credit notes and other documents use a deliberate manual review workflow.
+**[Try the guided browser preview - publication pending](https://mithundas79.github.io/doc-intake-service/)** | [Preview source](demo/) | [Install the complete app](#install-the-complete-local-application) | [Run the tests](#test-the-application-and-preview)
 
-## Install and run
+The Pages URL is the planned public address and may be unavailable until publication is configured and verified. You can already build the preview locally with the commands below. It uses three fictional samples and prepared field snapshots: **no Python API, native OCR, live classifier or SQLite runs on GitHub Pages**.
 
-Tested stack: Python 3.12, Node 20.20, Tesseract 5 with English data. No cloud account, paid API or GPU is needed. Install Python/Node plus native Tesseract: Ubuntu `sudo apt-get install tesseract-ocr`; macOS `brew install tesseract`; Windows use the Tesseract installer and put its directory on PATH. `tesseract --version` must work. Alternatively set `TESSERACT_CMD` to its full executable path before starting the server.
+## What this does, and where it runs
 
-From the repository root:
+| Capability | Guided browser preview | Complete local application |
+| --- | --- | --- |
+| Input | Three bundled fictional TXT samples | Your UTF-8 TXT, common images and multipage PDFs |
+| Text and type proposals | Prepared snapshots, explicitly labeled | Native Tesseract OCR, embedded PDF text and a trained classifier |
+| Human review | Edit, save/revalidate, approve/reject sample fields | Backend-validated corrections and explicit decisions |
+| Original comparison | Fictional original text beside prepared fields | Stored original preview beside extracted fields |
+| Export | Client-side approved-only JSON/CSV downloads | Transactional approved-only exports with audit events |
+| History and duplicates | Memory in this tab; resets on reload; no duplicate detection | Durable SQLite history and byte/business-identity duplicate checks |
+
+Only invoices have automated accounting checks. Contracts, statements, receipts, credit notes and other types require explicit manual review. The English-first extractor and classifier are fallible; this is a focused single-user local application, not an authenticated multi-user production service or professional accounting/legal judgment.
+
+## Try the guided preview
+
+The default **Incorrect total** sample deliberately states 349.84. Its subtotal 304.00 plus tax 25.84 equals 329.84.
+
+1. Compare the original with the fields. Approval starts disabled.
+2. Change **Total** to **329.84** and click **Save & revalidate**. The status becomes **ready**, while the approved count remains 0.
+3. Click **Approve sample**. The status becomes **approved** and downloads include exactly that sample.
+4. Download approved JSON/CSV and inspect the corrected total. Try **Manual review**: confirm the type, enter a note such as `Read the terms and verified the parties and date`, save/revalidate, then explicitly decide. Invoice arithmetic is not applied to the agreement.
+5. Try **Valid invoice**: it starts ready but is not exported until approved. Rejection requires a reason and excludes the sample from exports.
+6. **Reset all samples** or reload to restore the original samples and clear in-memory edits, approvals and activity. Already downloaded files remain on your computer.
+
+The preview is an illustrative client-side workflow, not a replacement for the Python rule engine. It performs no uploads or duplicate checks. Its small validation functions and activity display are clearly distinguished from backend validation and durable audit.
+
+To build and run only this static preview, install Node 20.20+ and run from the repository root (after cloning as below):
 
 ```sh
-python -m venv .venv
-# Linux/macOS:
-. .venv/bin/activate
-# Windows PowerShell instead:
-# .\.venv\Scripts\Activate.ps1
-python -m pip install -r server/requirements-dev.txt
 npm --prefix ui ci
+npm --prefix ui run build:demo
+npm --prefix ui run preview:demo -- --host 127.0.0.1 --port 18762 --strictPort
 ```
 
-A model is committed, so training is optional. To reproduce the original synthetic training metrics:
+Open **http://127.0.0.1:18762/doc-intake-service/**. This serves the built Pages bundle at its real project base path. It needs no Python or Tesseract. Browser automation for it is separate from the full application's tests.
+
+## Install the complete local application
+
+Use the feature branch below until PR #2 is merged. The default branch does not yet contain the complete review workflow.
+
+| Requirement | Version / check |
+| --- | --- |
+| Git | Needed to clone the repository |
+| Python | 3.12 tested; `python3 --version` on Linux/macOS or `py -3.12 --version` on Windows |
+| Node and npm | Node 20.20 tested; `node --version` and `npm --version` |
+| Native Tesseract + English language data |5.x; `tesseract --version` and `tesseract --list-langs` (must include `eng`) |
+
+Ubuntu: `sudo apt-get install tesseract-ocr`. macOS: `brew install tesseract`. On Windows, install Tesseract and add its executable directory to PATH, or set `TESSERACT_CMD` to the full executable path before running the server. No paid cloud account, GPU or external model API is required. Initial package installation downloads dependencies; OCR/classification then run locally.
+
+**Linux / macOS, fresh checkout:**
 
 ```sh
-python training/generate_corpus.py
-python training/train.py
+git clone --branch feature/persistent-document-review --single-branch https://github.com/mithundas79/doc-intake-service.git
+cd doc-intake-service
+python3 -m venv .venv
+.venv/bin/python -m pip install -r server/requirements-dev.txt
+npm --prefix ui ci
+tesseract --version
 ```
 
-Start the backend from **server/**, using the environment above:
+**Windows PowerShell, fresh checkout:**
+
+```powershell
+git clone --branch feature/persistent-document-review --single-branch https://github.com/mithundas79/doc-intake-service.git
+cd doc-intake-service
+py -3.12 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r server\requirements-dev.txt
+npm --prefix ui ci
+tesseract --version
+# If Tesseract is not on PATH, set this in the backend terminal:
+# $env:TESSERACT_CMD = 'C:\Program Files\Tesseract-OCR\tesseract.exe'
+```
+
+A trained model is committed. Training is optional, not a hidden startup requirement. To reproduce the synthetic training pipeline:
 
 ```sh
-cd server
-python -m uvicorn doc_intake_service.app:app --host 127.0.0.1 --port 18760
+# Linux/macOS; on Windows use .\.venv\Scripts\python.exe instead:
+.venv/bin/python training/generate_corpus.py
+.venv/bin/python training/train.py
 ```
 
-Start the UI from **ui/** in another terminal:
+## Run the complete application
+
+Use two terminals, both starting in the repository root. The commands choose a stable database directory and bind only to loopback.
+
+**Terminal 1 - backend, Linux / macOS:**
 
 ```sh
-npm run dev -- --host 127.0.0.1 --port 18761 --strictPort
+DOC_INTAKE_DATA="$PWD/server/data" .venv/bin/python -m uvicorn --app-dir server doc_intake_service.app:app --host 127.0.0.1 --port 18760
 ```
 
-Open http://127.0.0.1:18761. Vite proxies `/api` to 18760. Build with `npm --prefix ui run build`; `npm --prefix ui run preview -- --host 127.0.0.1 --port 18761` previews the same built UI and proxy. Use one server process, without `--workers` or development reload. A data-directory process lock prevents a second worker owner. Set `DOC_INTAKE_DATA` to an absolute directory to relocate storage; the default is `server/data` when launched as documented.
+**Terminal 1 - backend, Windows PowerShell:**
 
-## Five-minute walkthrough
+```powershell
+$env:DOC_INTAKE_DATA = Join-Path (Get-Location) 'server\data'
+.\.venv\Scripts\python.exe -m uvicorn --app-dir server doc_intake_service.app:app --host 127.0.0.1 --port 18760
+```
 
-1. Upload `samples/valid-invoice.txt`. It becomes `ready`; verify the original beside the proposed fields and explicitly click **Approve document**. Ready is not approved.
-2. Upload `samples/incorrect-total.txt`. The total 349.84 fails the arithmetic check. Change **total** to **329.84**, record your review note, click **Save corrections & revalidate**, then approve.
-3. Stop and restart the backend with the same data directory. The documents, originals, fields, decisions and history remain. Upload the valid invoice again: **Not a duplicate** fails and approval is blocked. Duplicate recognition includes originals and business identity, including after restart.
-4. Upload `samples/two-page-invoice.pdf`. Both pages contribute embedded text and OCR is skipped. It shares identity with the valid invoice, so will require duplicate handling if that sample is already present. To see a fresh ready result, use a separate empty `DOC_INTAKE_DATA` directory.
-5. Upload `samples/scanned-invoice.png` or `samples/scanned-invoice.pdf`. Native Tesseract extracts the text. They also share the example invoice identity; that deliberately demonstrates cross-format duplicate detection.
-6. Upload `samples/manual-contract.txt`. Select **contract**, check **I checked the document type**, and enter a note such as `Read the terms and verified the parties and effective date`. Save and revalidate, then explicitly approve or reject. Invoice arithmetic is not applied to a contract.
-7. **Export approved JSON/CSV** downloads approved records only. Expand **Review history** for corrections, before/after fields, checks and decisions. A rejected record can be reopened with a reason; reopen the original after a mistaken rejection rather than uploading another copy.
+**Terminal 2 - React UI, either platform:**
 
-All new samples are fictional, authored for this repository. `python scripts/make_samples.py` recreates them using Pillow/ReportLab and an installed font; raster appearance can vary by platform. No personal paperwork is included.
+```sh
+npm --prefix ui run dev -- --host 127.0.0.1 --port 18761 --strictPort
+```
+
+Open **http://127.0.0.1:18761**. The UI proxies `/api` to 18760; backend API docs are at http://127.0.0.1:18760/docs. Use one backend process, without `--workers` or reload. A directory lock prevents a second worker owner. Stop the server with Ctrl+C and restart using the same data directory to preserve the review result.
+
+`npm --prefix ui run build` builds the production UI. With the backend running, `npm --prefix ui run preview -- --host 127.0.0.1 --port 18761 --strictPort` previews that build with the same proxy. This is distinct from `preview:demo`.
+
+## Walk through real intake
+
+| Sample / action | Expected result in the local app |
+| --- | --- |
+| Upload `samples/valid-invoice.txt` | `ready`; explicit approval still required before export |
+| Upload `samples/incorrect-total.txt` | `review`; correct total 349.84 to 329.84, save/revalidate, then explicitly approve |
+| Restart and upload the valid invoice again | Original approval/history persist; the duplicate check fails and blocks approval |
+| Upload `samples/two-page-invoice.pdf` | Both embedded-text pages are read without OCR |
+| Upload `samples/scanned-invoice.png` or `.pdf` | Actual native Tesseract is used; review its extracted text/fields |
+| Upload `samples/manual-contract.txt` | Manual-only review; confirm contract type and add a 10-character review note, then save/revalidate and decide |
+| Export approved JSON/CSV | Only explicitly approved records are included; mutations and exports appear in history |
+
+The valid TXT, text PDF and scanned invoice share the same invoice identity. After the first is present, the others deliberately demonstrate cross-format duplicate detection; use a fresh `DOC_INTAKE_DATA` directory to observe each one's independent ready result. A rejected original can be reopened with a reason after a mistaken rejection. All new samples are fictional and rights-safe. `scripts/make_samples.py` recreates them using Pillow/ReportLab and an installed font; raster appearance can vary.
+
+## Test the application and preview
+
+Run from the repository root. Full application tests use a fresh temporary database and actual backend HTTP requests; the three browser workflows run the React UI plus backend, not mock responses. The separate static demo suite serves **built** output at `/doc-intake-service/` and exercises actual sample interactions/downloads at desktop/mobile sizes.
+
+**Linux / macOS:**
+
+```sh
+(cd server && ../.venv/bin/python -m pytest -q -ra)
+.venv/bin/python evaluation/evaluate.py
+npm --prefix ui run typecheck
+npm --prefix ui run build
+(cd ui && npx playwright install chromium)
+E2E_PYTHON="$PWD/.venv/bin/python" npm --prefix ui run test:e2e
+npm --prefix ui run build:demo
+npm --prefix ui run test:demo
+```
+
+**Windows PowerShell:**
+
+```powershell
+Push-Location server
+..\.venv\Scripts\python.exe -m pytest -q -ra
+Pop-Location
+.\.venv\Scripts\python.exe evaluation\evaluate.py
+npm --prefix ui run typecheck
+npm --prefix ui run build
+Push-Location ui
+npx playwright install chromium
+Pop-Location
+$env:E2E_PYTHON = (Resolve-Path .\.venv\Scripts\python.exe).Path
+npm --prefix ui run test:e2e
+npm --prefix ui run build:demo
+npm --prefix ui run test:demo
+```
+
+On Linux, if Chromium reports missing system libraries, run `npx playwright install --with-deps chromium` from `ui/`. Optionally set `PLAYWRIGHT_CHANNEL=chrome` to use an installed Chrome. Test servers reserve 18760/18761 for the complete app and 18762 for the built preview; stop manually running copies before browser tests. Native OCR tests require Tesseract and are skipped when it is absent locally; CI installs Tesseract and runs them. CI preserves the original 43 Python + 3 application-browser checks and adds the static preview interactions/screenshots.
+
+The demo build commands reuse the existing UI tool dependencies; there is no second install or Python dependency for `demo/`. The Pages workflow builds on main/manual dispatch and deploys only from main, subject to the `github-pages` environment protections. Publishing configuration and live URL verification are separate from building/testing the PR.
+
+## Evaluation: useful evidence, limited claims
+
+[Separate evaluation details](evaluation/README.md) and [actual predictions/results](evaluation/results.json) are committed. The generator's 300 related held-out documents score 100%; the separately authored fictional 24-text set scores **75% (18/24)** with macro F1 .748. Both are synthetic and English-only. Neither measures real-world accuracy, OCR quality, reliable accounting or legal suitability. The preview does not run either evaluation or the classifier.
+
+See [implementation and verification evidence](docs/implementation-status.md) for exact observed runs, earlier failure history and scope limits.
 
 ## Persistence and processing policy
 
@@ -79,24 +198,6 @@ Exports are auditable POST operations. JSON/CSV contain the approved snapshot wi
 **Run only on loopback for one trusted user.** There are no accounts, authentication, authorization, encryption at rest, malware scanner, tenant isolation or production operations guarantees. Originals and audit corrections may contain sensitive data; protect and back up the data directory yourself. Do not use network shares or expose this server through public tunnels/reverse proxies. Uploaded PDFs/images invoke native parsers; use documents you trust and keep native dependencies updated.
 
 The HTTP gate rejects untrusted Host, external/null Origin and cross-site browser requests, including simple multipart POSTs. Only the local UI origins on ports 18761/5173 or the request's same origin are trusted; scripts without Origin are permitted. This reduces drive-by browser access but is not authentication against another program or user on the machine. IDs resolve database rows, never caller-supplied paths. Original responses use safe generated filenames, nosniff and a sandbox CSP. No source text is sent to an external model/service.
-
-## Evaluation and verification
-
-See [evaluation/README.md](evaluation/README.md) for independently prepared fixtures, actual per-class results, predictions and limitations. The generator's 300-document held-out score was 100%; the separately authored 24-document set scored **75% (18/24)**. Both are fictional text sets. Neither measures real-world accuracy, OCR performance, reliable accounting nor legal suitability. Do not use the training score as a generalization claim.
-
-```sh
-# From server/ with the Python environment activated:
-python -m pytest -q -ra
-# From repository root:
-python evaluation/evaluate.py
-npm --prefix ui run typecheck
-npm --prefix ui run build
-# From ui/; backend + frontend are started automatically on 18760/18761:
-npx playwright install chromium
-npm run test:e2e
-```
-
-For browser tests, activate the Python environment or set `E2E_PYTHON` to its executable (use quotes for paths with spaces). Optionally set `PLAYWRIGHT_CHANNEL=chrome` to use an installed Chrome. Tests use a fresh temporary database and actual HTTP requests; no mocked backend responses. CI installs Tesseract and Chromium, runs real OCR/PDF tests, typechecks/builds and runs the review/correction/approval/export browser experience. See [docs/implementation-status.md](docs/implementation-status.md) for exact observed results and environment limitations.
 
 ## API
 

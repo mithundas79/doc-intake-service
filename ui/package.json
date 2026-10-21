@@ -8,7 +8,11 @@
     "build": "tsc -p tsconfig.json --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "typecheck:demo": "tsc -p ../demo/tsconfig.json --noEmit",
+    "build:demo": "npm run typecheck:demo && vite build ../demo --base=/doc-intake-service/",
+    "preview:demo": "vite preview ../demo --base=/doc-intake-service/",
+    "test:demo": "playwright test --config playwright.demo.config.ts"
   },
   "dependencies": {
     "react": "^18.3.1",

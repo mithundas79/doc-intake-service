@@ -1,0 +1,50 @@
+name: Publish guided sample preview
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "demo/**"
+      - "samples/*.txt"
+      - "ui/package*.json"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+      - run: npm --prefix ui ci
+      - run: npm --prefix ui run build:demo
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: demo/dist
+  deploy:
+    # Publishing is limited to the default branch. Environment protection rules
+    # remain authoritative; a manual build from a feature branch cannot deploy.
+    if: github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

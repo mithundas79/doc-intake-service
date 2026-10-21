@@ -47,6 +47,11 @@ jobs:
       - name: Browser workflow against real backend and frontend
         working-directory: ui
         run: npm run test:e2e
+      - name: Build and exercise the static Pages preview
+        working-directory: ui
+        run: |
+          npm run build:demo
+          npm run test:demo
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -56,3 +61,5 @@ jobs:
             server/doc_intake_service/model/metrics.json
             ui/test-results/
             ui/playwright-report/
+            ui/test-results-demo/
+            demo/dist/
