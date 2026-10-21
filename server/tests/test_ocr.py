@@ -57,7 +57,9 @@ def test_image_and_text_resource_bounds():
 @pytest.mark.skipif(shutil.which("tesseract") is None, reason="Native Tesseract required")
 def test_concurrent_scanned_pdfs_are_isolated(client):
     from concurrent.futures import ThreadPoolExecutor
+    import doc_intake_service.store as store_module
+    assert store_module.JOB_SECONDS == 240, "Prior timeout test must restore the decoder deadline"
     with ThreadPoolExecutor(max_workers=2) as pool:
         rows = list(pool.map(lambda _: upload(client, "scanned-invoice.pdf"), range(2)))
-    assert sorted(r["state"] for r in rows) == ["ready", "review"]
+    assert sorted(r["state"] for r in rows) == ["ready", "review"], rows
     assert all(r["record"]["total"] == "677.04" and r["ocr_used"] for r in rows)
