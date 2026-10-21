@@ -27,4 +27,6 @@ The separate Playwright configuration serves `demo/dist` under the real project 
 
 The Pages workflow builds on main/manual dispatch and deploys only from main, subject to the `github-pages` environment protections. Live-page verification follows a successful deployment; the source build alone does not establish that a deployment is available.
 
+After deployment, a separate read-only job runs the same six desktop/mobile tests against the public fictional preview and uploads screenshots and JUnit results as `published-demo-verification`. Setting `PUBLISHED_DEMO_URL` to exactly `https://mithundas79.github.io/doc-intake-service/` selects this mode and disables the local web server. Any other URL is rejected. With the variable absent, the built-local tests and their server remain unchanged. The published job does not run the Python backend or full-application browser tests.
+
 All fixtures are fictional and provided under the repository MIT license. The separate classifier evaluation scores 75% on 24 authored fictional texts; this static preview does not run that evaluation or claim real-world accuracy. See the [root README](../README.md) for local installation, test commands and operating limits.
