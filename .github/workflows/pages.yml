@@ -7,6 +7,8 @@ on:
       - "demo/**"
       - "samples/*.txt"
       - "ui/package*.json"
+      - "ui/playwright.demo.config.ts"
+      - "ui/e2e-demo/**"
       - ".github/workflows/pages.yml"
   workflow_dispatch:
 
@@ -48,3 +50,35 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+  verify-live:
+    name: Verify published fictional preview
+    needs: deploy
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+      - name: Install browser test dependencies
+        working-directory: ui
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+      - name: Exercise the published preview on desktop and mobile
+        working-directory: ui
+        env:
+          PUBLISHED_DEMO_URL: https://mithundas79.github.io/doc-intake-service/
+        run: npm run test:demo
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: published-demo-verification
+          path: ui/test-results-demo-live/
