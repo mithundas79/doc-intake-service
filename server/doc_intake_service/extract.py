@@ -21,7 +21,7 @@ NUMBER = re.compile(
     re.IGNORECASE,
 )
 DATE = re.compile(
-    r"(\d{1,2}\s+[A-Za-z]{3,9}\s+\d{4}|\d{1,2}[/\-]\d{1,2}[/\-]\d{2,4}|[A-Za-z]{3,9}\s+\d{1,2},?\s+\d{4})"
+    r"(\d{4}-\d{2}-\d{2}|\d{1,2}\s+[A-Za-z]{3,9}\s+\d{4}|\d{1,2}[/\-]\d{1,2}[/\-]\d{2,4}|[A-Za-z]{3,9}\s+\d{1,2},?\s+\d{4})"
 )
 MONTHS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"]
 
@@ -32,7 +32,7 @@ class DocumentRecord:
     number: str | None = None
     date: str | None = None
     due_date: str | None = None
-    currency: str = "USD"
+    currency: str = "UNKNOWN"
     subtotal: float | None = None
     tax: float | None = None
     total: float | None = None
@@ -99,10 +99,12 @@ def extract(text: str) -> DocumentRecord:
     lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
     rec = DocumentRecord(vendor=pick_vendor(lines))
 
-    if "€" in text or re.search(r"\bEUR\b", text):
-        rec.currency = "EUR"
-    elif "£" in text or re.search(r"\bGBP\b", text):
-        rec.currency = "GBP"
+    currencies = set()
+    for code, marker in (("USD", "$"), ("EUR", "€"), ("GBP", "£"), ("INR", "₹")):
+        if marker in text or re.search(r"\b" + code + r"\b", text):
+            currencies.add(code)
+    if len(currencies) == 1:
+        rec.currency = currencies.pop()
 
     line_sum = 0.0
     for raw in lines:

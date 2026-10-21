@@ -1,0 +1,68 @@
+import { test, expect } from "@playwright/test";
+import path from "node:path";
+import fs from "node:fs/promises";
+
+const sample = (name: string) => path.resolve("../samples", name);
+
+test("real upload, correction, explicit approval, persisted list and safe exports", async ({ page }) => {
+  await page.goto("/");
+  await page.getByLabel("Upload document").setInputFiles(sample("incorrect-total.txt"));
+  await expect(page.getByRole("heading", { name: "incorrect-total.txt", exact: true })).toBeVisible();
+  await expect(page.getByTestId("document-state")).toHaveText("review", { timeout: 30000 });
+  await expect(page.getByLabel("Original text")).toContainText("Total Due 349.84");
+  await expect(page.getByRole("button", { name: "Approve document", exact: true })).toBeDisabled();
+  await page.getByLabel("total", { exact: true }).fill("329.84");
+  await page.getByLabel("Review note").fill("Checked arithmetic and corrected the stated total");
+  await page.getByRole("button", { name: "Save corrections & revalidate" }).click();
+  await expect(page.getByTestId("document-state")).toHaveText("ready");
+  await page.getByRole("button", { name: "Approve document", exact: true }).click();
+  await expect(page.getByTestId("document-state")).toHaveText("approved");
+  await page.reload();
+  await page.getByRole("button", { name: /incorrect-total.txt/ }).click();
+  await expect(page.getByTestId("document-state")).toHaveText("approved");
+  await expect(page.getByLabel("total", { exact: true })).toHaveValue("329.84");
+  const download = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Export approved JSON" }).click();
+  const artifact = await download;
+  expect(artifact.suggestedFilename()).toBe("approved-records.json");
+  const json = JSON.parse(await fs.readFile((await artifact.path())!, "utf8"));
+  expect(json).toHaveLength(1); expect(json[0].total).toBe("329.84");
+  const csvDownload = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Export approved CSV" }).click();
+  const csv = await csvDownload;
+  expect(await fs.readFile((await csv.path())!, "utf8")).toContain("329.84");
+  await page.getByText(/Review history/).click();
+  await expect(page.locator(".history")).toContainText("approve");
+  await page.getByLabel("Upload document").setInputFiles(sample("incorrect-total.txt"));
+  await expect(page.getByRole("heading", { name: "incorrect-total.txt", exact: true })).toBeVisible();
+  await expect(page.getByTestId("document-state")).toHaveText("review");
+  await expect(page.locator(".checks")).toContainText("Check: Not a duplicate");
+  await page.getByLabel("Review note").fill("Duplicate original, do not export");
+  await page.getByRole("button", { name: "Reject document", exact: true }).click();
+  await expect(page.getByTestId("document-state")).toHaveText("rejected");
+});
+
+test("text PDF, actual OCR scan and manual-only contract are reviewable", async ({ page }) => {
+  await page.goto("/");
+  await page.getByLabel("Upload document").setInputFiles(sample("two-page-invoice.pdf"));
+  await expect(page.getByRole("heading", { name: "two-page-invoice.pdf", exact: true })).toBeVisible();
+  await expect(page.getByTestId("document-state")).toHaveText("ready", { timeout: 30000 });
+  await expect(page.locator('iframe[title="Original document"]')).toBeVisible();
+  await expect(page.getByLabel("total", { exact: true })).toHaveValue("677.04");
+  await page.getByLabel("Upload document").setInputFiles(sample("scanned-invoice.png"));
+  await expect(page.getByRole("heading", { name: "scanned-invoice.png", exact: true })).toBeVisible();
+  await expect(page.getByTestId("document-state")).toHaveText("review", { timeout: 30000 });
+  await expect(page.getByAltText("Original document")).toBeVisible();
+  await expect(page.getByLabel("total", { exact: true })).toHaveValue("677.04");
+  await expect(page.getByText(/OCR used/)).toBeVisible();
+  await page.getByLabel("Upload document").setInputFiles(sample("manual-contract.txt"));
+  await expect(page.getByRole("heading", { name: "manual-contract.txt", exact: true })).toBeVisible();
+  await expect(page.getByTestId("document-state")).toHaveText("review", { timeout: 30000 });
+  await page.getByLabel("Document type").selectOption("contract");
+  await page.getByLabel("I checked the document type against the original").check();
+  await page.getByLabel("Review note").fill("Read all terms and confirmed counterparty and date");
+  await page.getByRole("button", { name: "Save corrections & revalidate" }).click();
+  await expect(page.getByTestId("document-state")).toHaveText("ready");
+  await page.getByRole("button", { name: "Approve document", exact: true }).click();
+  await expect(page.getByTestId("document-state")).toHaveText("approved");
+});

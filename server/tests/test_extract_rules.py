@@ -1,77 +1,48 @@
+import pytest
 from doc_intake_service.extract import amounts_in, extract, norm_date
-from doc_intake_service.rules import SessionDuplicateStore, check
-
-GOOD = """Northwind Supplies
-INVOICE
-Invoice No: NW-2026-0481
-Invoice Date: 12 Aug 2026
-Due Date: 11 Sep 2026
-Filter cartridges 10 in 24 408.00
-Sealing rings box of 50 6 171.00
-Delivery 1 45.00
-Subtotal 624.00
-Tax 8.5% 53.04
-Total Due 677.04"""
-
-# The deliberate bad sample: 304.00 + 25.84 = 329.84, not 349.84.
-BAD_TOTALS = """Ridgeway Trading
-INVOICE
-Invoice No: RT-9912
-Invoice Date: 03 Aug 2026
-Pallet wrap 500m 12 216.00
-Strapping tape 4 88.00
-Subtotal 304.00
-Tax 8.5% 25.84
-Total Due 349.84"""
+from doc_intake_service.rules import duplicate_key, normalize_record, validate
+from conftest import SAMPLES
 
 
-def test_extracts_every_field_from_a_clean_invoice():
-    r = extract(GOOD)
-    assert r.vendor == "Northwind Supplies"
-    assert r.number == "NW-2026-0481"
-    assert r.date == "2026-08-12"
-    assert r.due_date == "2026-09-11"
-    assert (r.subtotal, r.tax, r.total) == (624.00, 53.04, 677.04)
-    assert r.line_total == 624.00
+def good():
+    return normalize_record(extract((SAMPLES / "valid-invoice.txt").read_text()).as_dict())
 
-
-def test_percentages_are_never_money():
+def test_extracts_fields_and_never_reads_percent_as_money():
+    row = good()
+    assert (row["vendor"], row["number"], row["date"]) == ("Northwind Supplies", "NW-2026-0481", "2026-08-12")
+    assert (row["subtotal"], row["tax"], row["total"], row["line_total"]) == ("624.00", "53.04", "677.04", "624.00")
     assert amounts_in("Tax 8.5% 53.04") == [53.04]
     assert amounts_in("Discount 10.00% applied") == []
+    assert all(c["ok"] for c in validate(row, "invoice", .9))
 
+def test_duplicate_identity_has_currency_and_normalized_amount():
+    row = good()
+    assert duplicate_key(row) == duplicate_key(dict(row, vendor=" NORTHWIND   Supplies ", total=677.04))
+    assert duplicate_key(row) != duplicate_key(dict(row, currency="INR"))
+    assert duplicate_key(dict(row, number=None)) is None
 
-def test_norm_date_both_orders():
-    assert norm_date("12 Aug 2026") == "2026-08-12"
+@pytest.mark.parametrize("doc_type", ["contract", "statement", "receipt", "credit_note", "other"])
+def test_noninvoice_types_are_explicitly_manual(doc_type):
+    row = good()
+    row.update(subtotal=None, tax=None, total=None, line_total=None)
+    checks = validate(row, doc_type, .99)
+    assert any(not c["ok"] and c["rule"] == "Manual review required" for c in checks)
+    assert not any("Subtotal" in c["rule"] for c in checks)
+    assert all(c["ok"] for c in validate(row, doc_type, .2, type_confirmed=True, manual_note="Read all pages and checked the metadata"))
+
+@pytest.mark.parametrize("value", ["03/04/2026", "2026-02-30", None, "yesterday"])
+def test_invalid_or_ambiguous_dates_block_approval(value):
+    assert not next(c for c in validate(dict(good(), date=value), "invoice", .99) if c["rule"] == "Date is unambiguous")["ok"]
+
+def test_no_currency_guess_and_mixed_currency_blocks():
+    assert extract("Acme\nTotal 20.00").currency == "UNKNOWN"
+    assert extract("Acme USD EUR\nTotal 20.00").currency == "UNKNOWN"
+    assert extract("Acme INR\nTotal 20.00").currency == "INR"
     assert norm_date("Aug 12, 2026") == "2026-08-12"
-    assert norm_date("03/04/2026") == "03/04/2026"  # ambiguous: passed through
+    assert not all(c["ok"] for c in validate(dict(good(), currency="UNKNOWN"), "invoice", .99))
 
-
-def test_all_rules_pass_on_the_clean_invoice():
-    r = extract(GOOD)
-    results = check(r, "invoice", 0.98, SessionDuplicateStore())
-    assert [c.rule for c in results if not c.ok] == []
-
-
-def test_totals_that_do_not_foot_are_caught():
-    r = extract(BAD_TOTALS)
-    results = check(r, "invoice", 0.98, SessionDuplicateStore())
-    bad = [c for c in results if c.rule == "Subtotal plus tax equals the total"][0]
-    assert not bad.ok
-    assert "329.84" in bad.detail
-
-
-def test_duplicate_flagged_on_second_sighting_only():
-    store = SessionDuplicateStore()
-    r = extract(GOOD)
-    first = check(r, "invoice", 0.98, store)
-    second = check(extract(GOOD), "invoice", 0.98, store)
-    assert all(c.ok for c in first)
-    assert any(c.rule.startswith("Duplicate") and not c.ok for c in second)
-
-
-def test_low_classifier_confidence_is_a_failing_rule():
-    r = extract(GOOD)
-    results = check(r, "invoice", 0.41, SessionDuplicateStore())
-    uncertain = [c for c in results if c.rule == "Document type uncertain"][0]
-    assert not uncertain.ok
-    assert "0.41" in uncertain.detail
+def test_low_confidence_and_negative_or_mismatched_amounts_block():
+    assert not all(c["ok"] for c in validate(good(), "invoice", .3))
+    assert all(c["ok"] for c in validate(good(), "invoice", .3, type_confirmed=True))
+    assert not all(c["ok"] for c in validate(dict(good(), tax="-1.00"), "invoice", .99))
+    assert not all(c["ok"] for c in validate(dict(good(), total="677.05"), "invoice", .99))
