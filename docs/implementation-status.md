@@ -1,33 +1,40 @@
-# Implementation checkpoint
+# Implementation and verification checkpoint
 
-Branch: feature/persistent-document-review. Issue: #1.
+Branch: `feature/persistent-document-review`. Draft PR: https://github.com/mithundas79/doc-intake-service/pull/2 (references issue #1). No merge or default-branch commit was performed.
 
 ## Acceptance mapping
 
-- Durable originals, fields, jobs, decisions, duplicate identity, history: `store.py`; SQLite WAL/FULL transactions, originals stored as BLOBs in the same DB.
-- Bounded processing/restart: two worker threads, queue cap 32, isolated decoder children, hard 240-second timeout; restart requeues interrupted attempts fewer than 3, otherwise fails visibly.
-- Real text/image/multipage PDF: `pipeline.py`, pypdf + pypdfium2; embedded text skips OCR, scans invoke native Tesseract with 20-second per-page timeout; 8 MB, 10 pages, 16 MP/page and 500000 text-character bounds.
-- React list/preview/correction/revalidation/explicit decisions/history: `ui/src/App.tsx`.
-- Transactional review/idempotency/exports: expected version and request IDs; unique approval hash and business identity. Failed checks cannot approve. JSON/CSV contain approved records only; CSV formula cells escaped.
-- Type policy: invoices checked with exact decimal arithmetic. Contracts, statements, receipts, credit notes and other are manual only; confirmation and explanatory note required.
-- Security: loopback hosting, trusted Host/Origin gate including simple multipart requests, ASGI/request/file reading bounds, server IDs, no caller-provided filesystem paths. Single-user local boundary, no multi-tenant claims.
-- Independent evaluation: 24 hand-authored fictional texts separate from generator in `evaluation/independent.jsonl`; actual `results.json` reports 18/24 correct (75%), never a real-world accuracy claim.
-- Samples: valid/bad total TXT, manual contract, 2-page text PDF, PNG scan, scanned PDF; rights-safe authored sources plus generation script.
-- CI/startup/docs and final verification: in progress.
+| Acceptance criterion | Implementation and verification evidence |
+| --- | --- |
+| Durable documents, originals, extraction, decisions, duplicate identity and review history | `store.py` stores original BLOBs and all metadata/history in SQLite WAL/FULL transactions; `test_restart_persists_original_approval_duplicate_and_history` and real HTTP subprocess `test_restart_with_same_database_and_original` reopen the same DB and verify original bytes, approval, history, export and duplicate rejection. |
+| Bounded background jobs and restart recovery | Two transactionally claiming workers, cap32 pending jobs, private decoder processes, hard240s parent deadline and20s OCR/page; queue bound, interrupted recovery, three-interruption terminal failure, process ownership and real child timeout tests. |
+| Text, common images, embedded/scanned multipage PDFs with limits | `pipeline.py`, pypdf/pypdfium2 and native Tesseract; committed 2-page text PDF, PNG scan and scanned PDF; tests assert actual OCR results, text PDF OCR avoidance, concurrent scan isolation, encryption/page/image/text bounds. |
+| React list, original preview, corrections, checks, revalidation and explicit decisions | `App.tsx`; real-backend Playwright exercises corrected total, approval, persisted list, downloads, rejection, text PDF, OCR image and manual contract. A delayed actual API response regression prevents stale polls overwriting another selected form. |
+| Auditable and concurrency-safe review/export | Versions plus unique request IDs; transactionally rerun checks before approval, unique approved original/business identity constraints; concurrent/repeated approvals and edits, identity reuse, stale version and history before/after tests. Export events record included IDs/versions. |
+| Approved JSON/CSV export and durable duplicates | Approved-only snapshots, fixed filenames and CSV formula escaping; API tests inspect JSON/CSV and export audit; restart and cross-document concurrent approval tests. |
+| Appropriate type/currency/amount policy | Invoices use exact Decimal checks and explicit supported currency/date. All other types require type confirmation and explanatory manual note; no invoice arithmetic on contracts/statements. Tests cover every manual type, dates, amounts, currency, duplicate keys and rejected-original reopen. |
+| Bounded input reading, clear failures, safe identifiers and local boundary | ASGI bytes checked before multipart spooling plus bounded file reads; unsupported/corrupt/oversized/streamed input tests; server-generated IDs/BLOB storage; Host/Origin/cross-site gate and path/ID tests. |
+| Separate rights-safe evaluation with actual per-class results |24 manually authored fictional texts in `evaluation/independent.jsonl`, never read by training. `results.json` records model/fixture hashes, predictions and metrics.18/24 correct (75%); macro F1.748, not a real-world accuracy claim. |
+| Reproducible startup, samples, walkthrough and limits | README contains Python/Node/Tesseract install/run commands, sample walkthrough, recovery/duplicate/reopen/export policies, local-use boundary and dependency licenses. `scripts/make_samples.py` authors sample TXT/PDF/scan files. |
+| Python, frontend and actual browser CI | `.github/workflows/ci.yml` pins Ubuntu24.04, installs Tesseract, reproduces training/evaluation, runs Python suite, typecheck/build and real React/backend Playwright; uploads metrics, traces and approved-document screenshot. Final corrected-head run is pending at this checkpoint; its exact result/link will be recorded on the PR to avoid a documentation-only verification loop. |
 
-## Observed verification at this checkpoint
+## Observed commands and results
 
-- Initial Python suite before isolated-decoder addition: 38 passed, 1 failed in 12.02s. Failure was streamed oversized upload returning parser 400; changed raised exception to HTTPException 413. Rerun in progress, not yet claimed passed.
-- `npm --prefix ui run build`: passed twice (TypeScript plus Vite build).
-- `.venv/Scripts/python evaluation/evaluate.py`: completed; contract P/R/F1 1.00/.83/.91; invoice .67/.67/.67; receipt .60/1.00/.75; statement 1.00/.50/.67. 1/24 ready before review; zero automatically approved by application policy.
-- First real Playwright run: correction/approval/refresh/export test passed; second upload/scan/manual test hit a UI timing assumption (waited on old document's shared status). Added explicit selected-document name waits before checks. Rerun pending. Windows webserver teardown hung and required stopping the known test-owned backend PID; not claimed as a passing browser run.
+- Local environment: Python3.12.10, Node20.20.2, native Tesseract installed. Dependencies installed in the checkout virtual environment; initial pip temp-permission failure resolved with workspace TEMP/TMP, without sandbox escalation.
+- Initial local `cd server; python -m pytest -q`:38 passed,1 failed in12.02s before process-isolation additions. The failing streamed oversized-upload status was parser400; fixed to explicit HTTP413 and subsequently passed in Linux CI.
+- Second local Python run: **blocked/unknown**. Automatic approval review rejected polling the active test session, citing an unapproved request to `dc.services.visualstudio.com` with unknown payload. This was not rerun through another local launcher. No unknown result is counted as passed, and the telemetry source/payload was not established.
+- Initial local actual React/backend Playwright run: first correction/approval/export scenario passed; second upload/manual scenario failed. Later hosted CI identified the remaining strict-label ambiguity and it was fixed with an exact combobox locator. No local Python/browser rerun followed the approval block.
+- `python evaluation/evaluate.py`: completed locally and reproduced in Linux CI. Contract precision/recall/F1:1.000/.833/.909; invoice:.667/.667/.667; receipt:.600/1.000/.750; statement:1.000/.500/.667;6/class. One document ready before human review; application auto-approvals:zero.
+- Linux run https://github.com/mithundas79/doc-intake-service/actions/runs/39616231474 at1903092:42 Python passed,1 failed in42.73s. Concurrent scanned PDFs both became failed; original assertion omitted errors, so cause remains unexplained. Individual real scan tests passed. Added full result/error diagnostics and an assertion that the timeout-test monkeypatch restored240s; did not relax assertions or resource limits.
+- Linux run https://github.com/mithundas79/doc-intake-service/actions/runs/39617319309 at4282182: `python -m pytest -q -ra` **43 passed**,1 deprecation warning in38.55s. Browser provisioning then failed because Playwright1.56.1 rejects Ubuntu26.04, which `ubuntu-latest` had selected. Pinned supported Ubuntu24.04.
+- Diagnostic-head f33a18b Linux run also passed Python before the same old Ubuntu26.04 provisioning failure. The first concurrency failure did not recur in those required runs; that does not prove its cause or justify hiding it.
+- Linux run https://github.com/mithundas79/doc-intake-service/actions/runs/39618100108 at e990682: Python/native suite, browser provisioning, frontend typecheck and build passed; real Playwright **2 passed,1 failed in18.2s**. The only failure was `getByLabel('Document type')` also matching its confirmation checkbox. Corrected to the exact named combobox, retaining all scenario assertions. Late-response regression passed.
+- Artifact12352843680 from that run includes `approved-document.png`. Both implementer and independent reviewer visually inspected original text beside corrected329.84, approved state and zero failed checks. Actual browser/backend evidence, no mock UI responses.
+- Local `npm --prefix ui run typecheck` and `npm --prefix ui run build` passed before and after the UI implementation. Final compatible tooling fix uses Vite6.4.4 plus plugin-react4.7.0; their declared supported Node/Vite ranges were inspected.
+- `npm audit` initially reported dev-only esbuild, source-map-js and Vite advisories. `npm audit --omit=dev` reported0. A compatible source-map-js patch and supported Vite6.4.4/plugin-react4.7.0 update resolve the development-tool advisories; installation reports0 vulnerabilities. Post-upgrade typecheck and Vite6.4.4 build passed (717ms build); npm audit returned0 total advisories. Complete exact-head CI is the remaining verification gate.
 
-## Remaining work
+## Delivered scope and limitations
 
-Finish API and live-browser reruns; add CI and startup/walkthrough/security/evaluation docs; inspect output, push milestone and open draft PR. Windows has per-input/page/pixel/time limits but does not apply the POSIX child address-space ceiling. Classifier/extractor are English-first demo heuristics, not financial or legal judgment. Existing audit.jsonl from the old demo is not automatically migrated.
+Implementation, startup docs, walkthrough, evaluation, samples, CI and draft PR are delivered. Remaining work is the final corrected-head full CI result and any concrete resulting fixes. No multi-user/production readiness claim is made. Windows lacks the POSIX1.5GiB decoder address-space cap; it still has input/page/pixel/text/time limits. Extraction/classification are English-first heuristics. Mixed text/image PDF pages with an existing substantial text layer do not OCR additional image regions. Manual documents without number/total use byte identity only. Audit is durable, not tamper-proof against local filesystem access. Old demo audit.jsonl data is not automatically migrated.
 
-Checkpoint SHA: 71ab8c6 (first implementation milestone; pushed).
-
-Additional updates: isolated-decoder hard-timeout and real HTTP subprocess restart tests, late-poll UI regression, CI and full walkthrough added. UI responses are guarded by effect cleanup and selected document identity; switching is disabled during mutations/uploads.
-
-Local verification blocker: automatic approval review rejected polling the second Python suite, citing an unapproved telemetry request to dc.services.visualstudio.com with unknown payload. The second suite result is unknown, not passed. No rerun through another local launcher was attempted. First browser test passed locally, second timing failure fixed but local browser rerun remains unverified. Required GitHub CI will run against committed fictional data with real backend/frontend/OCR and publish artifacts. No host files or credentials are test fixtures.
+Checkpoint SHAs:71ab8c6 first durable-review milestone; e990682 recorded Linux Python/build and partial browser evidence above. The next commit contains final selector/dependency corrections and this refreshed checkpoint. Exact final SHA/run/result will be posted on the PR after verification. PR attachment was attempted; the Codex app bridge returned MCP-32000, while GitHub PR creation succeeded.

@@ -59,7 +59,7 @@ test("text PDF, actual OCR scan and manual-only contract are reviewable", async 
   await page.getByLabel("Upload document").setInputFiles(sample("manual-contract.txt"));
   await expect(page.getByRole("heading", { name: "manual-contract.txt", exact: true })).toBeVisible();
   await expect(page.getByTestId("document-state")).toHaveText("review", { timeout: 30000 });
-  await page.getByLabel("Document type").selectOption("contract");
+  await page.getByRole("combobox", { name: "Document type", exact: true }).selectOption("contract");
   await page.getByLabel("I checked the document type against the original").check();
   await page.getByLabel("Review note").fill("Read all terms and confirmed counterparty and date");
   await page.getByRole("button", { name: "Save corrections & revalidate" }).click();
