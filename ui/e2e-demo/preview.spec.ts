@@ -99,7 +99,8 @@ test("manual review, rejection reason, reload reset and formula-safe CSV", async
   await page.getByRole("button", { name: "Download approved CSV" }).click();
   artifact = await downloaded;
   expect(await fs.readFile((await artifact.path())!, "utf8")).toContain("'=SAMPLE()");
-  await expect(page.getByRole("link", { name: "Install & test", exact: true })).toHaveAttribute("href", /feature\/persistent-document-review\/README.md/);
+  await expect(page.getByRole("link", { name: "Install & test", exact: true })).toHaveAttribute("href", /blob\/main\/README\.md#install-the-complete-local-application$/);
+  await expect(page.getByRole("link", { name: "Demo source", exact: true })).toHaveAttribute("href", /tree\/main\/demo$/);
 });
 
 test("keyboard focus survives save, final decision, reset and sample selection", async ({ page }) => {

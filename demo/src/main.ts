@@ -9,7 +9,7 @@ type Audit = { action: string; sample: string; detail: string; at: string };
 
 const root = document.querySelector<HTMLDivElement>("#app")!;
 const sourceURL = "https://github.com/mithundas79/doc-intake-service";
-const installURL = `${sourceURL}/blob/feature/persistent-document-review/README.md#install-the-complete-local-application`;
+const installURL = `${sourceURL}/blob/main/README.md#install-the-complete-local-application`;
 const labels: Record<keyof Fields, string> = { vendor: "Vendor / counterparty", number: "Document number", date: "Date", currency: "Currency", subtotal: "Subtotal", tax: "Tax", total: "Total", line_total: "Line total" };
 let states: State[];
 let selected = "incorrect-total";
@@ -118,7 +118,7 @@ function render(focusSelector?: string): void {
         <div class="audit-panel"><p class="eyebrow">IN-MEMORY ACTIVITY</p><h2>See what changed</h2><p class="caption">An illustrative activity preview, not the local application's durable audit.</p><ol id="audit" reversed>${[...audit].reverse().map(item => `<li><strong>${escape(item.action)}</strong><span>${escape(item.sample)}</span><p>${escape(item.detail)}</p></li>`).join("")}</ol></div>
       </section>
       <section id="capabilities" class="capabilities"><p class="eyebrow">CHOOSE THE RIGHT ENVIRONMENT</p><h2>The preview explains. The local app processes.</h2><div class="table-scroll"><table><caption>Capabilities of this static preview and the complete local application</caption><thead><tr><th scope="col">Capability</th><th scope="col">This sample preview</th><th scope="col">Local Python + React app</th></tr></thead><tbody><tr><th scope="row">Input</th><td>Three bundled fictional TXT samples</td><td>Your TXT, image and multipage PDF uploads</td></tr><tr><th scope="row">OCR / classification</th><td>Prepared snapshots; neither runs here</td><td>Native Tesseract + fallible trained classifier</td></tr><tr><th scope="row">Review / exports</th><td>Client-side illustration and downloads</td><td>Backend-validated, audited decisions and exports</td></tr><tr><th scope="row">History / duplicates</th><td>Tab memory only; no durable duplicate detection</td><td>Transactional SQLite and durable duplicate identity</td></tr><tr><th scope="row">After reload</th><td>Samples reset</td><td>Originals and review decisions persist</td></tr></tbody></table></div><p>No data is uploaded by this preview. To process your own documents, <a href="${installURL}">follow the local installation and test instructions</a>. The complete app is for one trusted user on loopback, not a production multi-user service.</p></section>
-      <footer><span>Fictional samples and project code: MIT. No real-world accuracy claim.</span><a href="${sourceURL}/tree/feature/persistent-document-review/demo">Demo source</a><a href="${installURL}">Install &amp; test</a></footer>
+      <footer><span>Fictional samples and project code: MIT. No real-world accuracy claim.</span><a href="${sourceURL}/tree/main/demo">Demo source</a><a href="${installURL}">Install &amp; test</a></footer>
     </main>`;
   bind();
   syncButtons();

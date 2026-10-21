@@ -2,9 +2,9 @@
 
 A local document review workspace for one person handling invoices and business documents. Upload TXT, an image or a multipage PDF; background workers propose text, fields and a document type; compare them with the original, correct mistakes, revalidate, and explicitly approve or reject. SQLite keeps originals, decisions, duplicate identity and review history across restarts. JSON/CSV exports contain **approved records only**. Nothing is automatically approved.
 
-**[Try the guided browser preview - publication pending](https://mithundas79.github.io/doc-intake-service/)** | [Preview source](demo/) | [Install the complete app](#install-the-complete-local-application) | [Run the tests](#test-the-application-and-preview)
+**[Try the guided browser preview](https://mithundas79.github.io/doc-intake-service/)** | [Preview source](demo/) | [Install the complete app](#install-the-complete-local-application) | [Run the tests](#test-the-application-and-preview)
 
-The Pages URL is the planned public address and may be unavailable until publication is configured and verified. You can already build the preview locally with the commands below. It uses three fictional samples and prepared field snapshots: **no Python API, native OCR, live classifier or SQLite runs on GitHub Pages**.
+The browser preview uses three fictional samples and prepared field snapshots: **no Python API, native OCR, live classifier or SQLite runs on GitHub Pages**. You can also build it locally with the commands below. Check the [Pages release workflow](https://github.com/mithundas79/doc-intake-service/actions/workflows/pages.yml) for deployment status.
 
 ## What this does, and where it runs
 
@@ -44,7 +44,7 @@ Open **http://127.0.0.1:18762/doc-intake-service/**. This serves the built Pages
 
 ## Install the complete local application
 
-Use the feature branch below until PR #2 is merged. The default branch does not yet contain the complete review workflow.
+Clone `main` using the platform-specific commands below. The complete application and guided preview share this repository.
 
 | Requirement | Version / check |
 | --- | --- |
@@ -58,7 +58,7 @@ Ubuntu: `sudo apt-get install tesseract-ocr`. macOS: `brew install tesseract`. O
 **Linux / macOS, fresh checkout:**
 
 ```sh
-git clone --branch feature/persistent-document-review --single-branch https://github.com/mithundas79/doc-intake-service.git
+git clone --branch main --single-branch https://github.com/mithundas79/doc-intake-service.git
 cd doc-intake-service
 python3 -m venv .venv
 .venv/bin/python -m pip install -r server/requirements-dev.txt
@@ -69,7 +69,7 @@ tesseract --version
 **Windows PowerShell, fresh checkout:**
 
 ```powershell
-git clone --branch feature/persistent-document-review --single-branch https://github.com/mithundas79/doc-intake-service.git
+git clone --branch main --single-branch https://github.com/mithundas79/doc-intake-service.git
 cd doc-intake-service
 py -3.12 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r server\requirements-dev.txt
