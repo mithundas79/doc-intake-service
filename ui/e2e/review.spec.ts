@@ -4,7 +4,7 @@ import fs from "node:fs/promises";
 
 const sample = (name: string) => path.resolve("../samples", name);
 
-test("real upload, correction, explicit approval, persisted list and safe exports", async ({ page }) => {
+test("real upload, correction, explicit approval, persisted list and safe exports", async ({ page }, testInfo) => {
   await page.goto("/");
   await page.getByLabel("Upload document").setInputFiles(sample("incorrect-total.txt"));
   await expect(page.getByRole("heading", { name: "incorrect-total.txt", exact: true })).toBeVisible();
@@ -17,6 +17,7 @@ test("real upload, correction, explicit approval, persisted list and safe export
   await expect(page.getByTestId("document-state")).toHaveText("ready");
   await page.getByRole("button", { name: "Approve document", exact: true }).click();
   await expect(page.getByTestId("document-state")).toHaveText("approved");
+  await page.screenshot({ path: testInfo.outputPath("approved-document.png"), fullPage: true });
   await page.reload();
   await page.getByRole("button", { name: /incorrect-total.txt/ }).click();
   await expect(page.getByTestId("document-state")).toHaveText("approved");

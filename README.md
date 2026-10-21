@@ -102,7 +102,7 @@ For browser tests, activate the Python environment or set `E2E_PYTHON` to its ex
 
 `GET /api/health`, `POST /api/documents` (multipart), `GET /api/documents`, `GET /api/documents/{id}`, `GET /api/documents/{id}/original`, `GET /api/documents/{id}/history`.
 
-`POST /api/documents/{id}/review` takes `{version, request_id, record, doc_type, type_confirmed, note}`. It saves corrections and revalidates atomically. `POST .../approve`, `.../reject`, `.../reopen` take `{version, request_id, note}`. `POST /api/exports/json` or `/csv` exports approved records and records the export event. See `/docs` on the backend for request schemas. Statuses: queued → processing → ready/review/failed; ready/review → approved/rejected; rejected → ready/review through explicit reopen.
+`POST /api/documents/{id}/review` takes `{version, request_id, record, doc_type, type_confirmed, note}`. It saves corrections and revalidates atomically. `POST .../approve`, `.../reject`, `.../reopen` take `{version, request_id, note}`. `POST /api/exports/json` or `/csv` exports approved records and records the export event. See `/docs` on the backend for request schemas. Statuses: queued  ->  processing  ->  ready/review/failed; ready/review  ->  approved/rejected; rejected  ->  ready/review through explicit reopen.
 
 ## License
 

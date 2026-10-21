@@ -26,4 +26,8 @@ Branch: feature/persistent-document-review. Issue: #1.
 
 Finish API and live-browser reruns; add CI and startup/walkthrough/security/evaluation docs; inspect output, push milestone and open draft PR. Windows has per-input/page/pixel/time limits but does not apply the POSIX child address-space ceiling. Classifier/extractor are English-first demo heuristics, not financial or legal judgment. Existing audit.jsonl from the old demo is not automatically migrated.
 
-Checkpoint SHA: see git log for the commit containing this file (self-reference cannot be embedded).
+Checkpoint SHA: 71ab8c6 (first implementation milestone; pushed).
+
+Additional updates: isolated-decoder hard-timeout and real HTTP subprocess restart tests, late-poll UI regression, CI and full walkthrough added. UI responses are guarded by effect cleanup and selected document identity; switching is disabled during mutations/uploads.
+
+Local verification blocker: automatic approval review rejected polling the second Python suite, citing an unapproved telemetry request to dc.services.visualstudio.com with unknown payload. The second suite result is unknown, not passed. No rerun through another local launcher was attempted. First browser test passed locally, second timing failure fixed but local browser rerun remains unverified. Required GitHub CI will run against committed fictional data with real backend/frontend/OCR and publish artifacts. No host files or credentials are test fixtures.

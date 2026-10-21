@@ -52,7 +52,7 @@ export function App(): JSX.Element {
   useEffect(() => {
     if (!selected) return;
     let alive = true;
-    void api<Document>(`/documents/${selected}`).then(value => { if (alive) load(value); }).catch(e => setError(String(e)));
+    void api<Document>(`/documents/${selected}`).then(value => { if (alive && selectedRef.current === value.id) load(value); }).catch(e => setError(String(e)));
     return () => { alive = false; };
   }, [selected]);
   useEffect(() => {
