@@ -66,3 +66,34 @@ test("text PDF, actual OCR scan and manual-only contract are reviewable", async 
   await page.getByRole("button", { name: "Approve document", exact: true }).click();
   await expect(page.getByTestId("document-state")).toHaveText("approved");
 });
+
+
+test("late real backend poll cannot overwrite a different selected document", async ({ page }) => {
+  await page.goto("/");
+  await page.getByLabel("Upload document").setInputFiles(sample("valid-invoice.txt"));
+  await expect(page.getByRole("heading", { name: "valid-invoice.txt", exact: true })).toBeVisible();
+  await expect(page.getByTestId("document-state")).not.toHaveText(/queued|processing/, { timeout: 30000 });
+  let release!: () => void;
+  let observed!: () => void;
+  const held = new Promise<void>(resolve => { release = resolve; });
+  const seen = new Promise<void>(resolve => { observed = resolve; });
+  let intercepted = false;
+  await page.route(/\/api\/documents\/[a-f0-9]{32}$/, async route => {
+    // Forward to the real backend, then delay one actual response to model a slow connection.
+    const response = await route.fetch();
+    const value = await response.json();
+    if (!intercepted && value.name === "scanned-invoice.png") {
+      intercepted = true; observed(); await held;
+    }
+    await route.fulfill({ response });
+  });
+  await page.getByLabel("Upload document").setInputFiles(sample("scanned-invoice.png"));
+  await expect(page.getByRole("heading", { name: "scanned-invoice.png", exact: true })).toBeVisible();
+  await seen;
+  await page.getByRole("button", { name: /valid-invoice.txt/ }).click();
+  await expect(page.getByRole("heading", { name: "valid-invoice.txt", exact: true })).toBeVisible();
+  release();
+  await page.waitForTimeout(700);
+  await expect(page.getByRole("heading", { name: "valid-invoice.txt", exact: true })).toBeVisible();
+  await expect(page.getByLabel("total", { exact: true })).toHaveValue("677.04");
+});

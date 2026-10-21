@@ -192,3 +192,32 @@ def test_malformed_money_rejected_without_state_change(client, value):
     response = review(client, row, record=dict(row["record"], total=value))
     assert response.status_code == 422, response.text
     assert client.get(f"/api/documents/{row['id']}").json()["version"] == row["version"]
+
+
+def test_decoder_hard_timeout_is_terminal_and_api_remains_responsive(tmp_path, monkeypatch):
+    import doc_intake_service.store as module
+    monkeypatch.setattr(module, "JOB_SECONDS", .001)
+    with TestClient(create_app(tmp_path)) as client:
+        row = upload(client)
+        assert row["state"] == "failed"
+        assert "TimeoutExpired" in row["error"]
+        assert client.get("/api/health").status_code == 200
+        assert any(h["action"] == "failed" for h in client.get(f"/api/documents/{row['id']}/history").json())
+
+
+def test_asgi_stream_limiter_stops_receiving_after_bound():
+    import asyncio
+    from doc_intake_service.app import LocalBoundary
+    received, sent = [], []
+    async def inner(scope, receive, send):
+        while True:
+            await receive()
+    async def receive():
+        received.append(1)
+        return {"type": "http.request", "body": b"x"*65536, "more_body": True}
+    async def send(message):
+        sent.append(message)
+    scope = {"type": "http", "headers": [(b"host", b"localhost")], "method": "POST", "path": "/api/documents"}
+    asyncio.run(LocalBoundary(inner)(scope, receive, send))
+    assert sent[0]["status"] == 413
+    assert len(received) <= MAX_REQUEST_BYTES // 65536 + 1
