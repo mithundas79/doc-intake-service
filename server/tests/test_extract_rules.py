@@ -13,6 +13,8 @@ def test_extracts_fields_and_never_reads_percent_as_money():
     assert (row["subtotal"], row["tax"], row["total"], row["line_total"]) == ("624.00", "53.04", "677.04", "624.00")
     assert amounts_in("Tax 8.5% 53.04") == [53.04]
     assert amounts_in("Discount 10.00% applied") == []
+    assert amounts_in("Overprecision 10.001; decimal comma 1.234,56; bad grouping 1,2,3.45") == []
+    assert amounts_in("USD 1,234.56; INR 1,23,456.78") == [1234.56, 123456.78]
     assert all(c["ok"] for c in validate(row, "invoice", .9))
 
 def test_duplicate_identity_has_currency_and_normalized_amount():

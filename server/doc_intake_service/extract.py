@@ -11,7 +11,9 @@ from __future__ import annotations
 import re
 from dataclasses import asdict, dataclass, field
 
-AMOUNT = re.compile(r"(-?\d[\d,]*\.\d{2})(?!\s*%)")
+AMOUNT = re.compile(
+    r"(?<![\d.,])(-?(?:\d{1,3}(?:,\d{3})+|\d{1,2}(?:,\d{2})*,\d{3}|\d+)\.\d{2})(?![\d.,]|\s*%)"
+)
 DOC_LABEL = re.compile(
     r"\b(tax\s+)?(invoice|receipt|bill|statement|credit\s*(note|memo)|purchase\s*order|remittance)\b",
     re.IGNORECASE,
